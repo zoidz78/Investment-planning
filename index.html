@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Savings & Investment Projection Dashboard</title>
+  <!-- Tailwind CSS & Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans p-4 sm:p-6" id="app-body">
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- Header with Regional App Equivalents -->
+    <header class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+      <h1 class="text-2xl font-bold text-slate-900">Savings & Investment Projection</h1>
+      <p class="text-slate-600 text-sm leading-relaxed">
+        Comparing steady savings vs. fixed yield vs. low-fee Vanguard/DIY DCA vs. high-fee Investment-Linked Policies (ILP).
+      </p>
+      <div class="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100 text-xs text-indigo-900 space-y-1 mt-2">
+        <p class="font-semibold">📱 Platform Context & International Equivalents:</p>
+        <p>
+          If you are familiar with wealth management platforms like <b>Endowus</b> (popular in Singapore for low-cost unit trust & CPF portfolios), the direct UK equivalents for automated low-cost index investing are <b>Vanguard UK</b>, <b>Nutmeg</b>, or <b>InvestEngine</b>.
+        </p>
+      </div>
+    </header>
+
+    <!-- Controls & Summary Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Input Card -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+        <div class="flex items-center justify-between">
+          <label for="monthly-input" class="block font-semibold text-slate-700">
+            Monthly Contribution (<span id="currency-symbol">£</span>)
+          </label>
+          <span id="save-indicator" class="text-xs text-emerald-600 font-medium transition-opacity duration-300 opacity-0">✓ Saved</span>
+        </div>
+
+        <div class="relative">
+          <input 
+            type="number" 
+            id="monthly-input" 
+            inputmode="decimal"
+            enterkeyhint="done"
+            class="w-full text-2xl font-bold border-2 border-slate-300 rounded-xl p-3 pr-16 text-slate-900 focus:outline-none focus:border-indigo-500"
+            value="250" 
+            step="50" 
+            min="10"
+          />
+          <button 
+            type="button" 
+            id="enter-btn"
+            class="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 rounded-lg transition-colors cursor-pointer"
+          >
+            Enter ↵
+          </button>
+        </div>
+
+        <input 
+          type="range" 
+          id="monthly-slider" 
+          class="w-full accent-indigo-600 cursor-pointer"
+          value="250" 
+          min="50" 
+          max="2500" 
+          step="50"
+        />
+        
+        <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 space-y-1">
+          <p>💡 <b>How Saving Works:</b></p>
+          <p>• <b>Slider:</b> Automatically saves in your browser as you drag.</p>
+          <p>• <b>Text Box:</b> Auto-saves when you press <b>Enter</b>, click away, or tap the <b>Enter ↵</b> button.</p>
+        </div>
+      </div>
+
+      <!-- Key Milestones Card -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 md:col-span-2 flex flex-col justify-between">
+        <h2 class="font-semibold text-slate-800 border-b pb-2">Vanguard / Low-Fee Portfolio Milestones</h2>
+        <div class="grid grid-cols-3 gap-3 my-auto text-center py-2">
+          <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+            <div class="text-xs font-semibold text-indigo-600 uppercase">5 Years</div>
+            <div class="text-lg sm:text-xl font-bold text-indigo-950 mt-1" id="milestone-5">-</div>
+          </div>
+          <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+            <div class="text-xs font-semibold text-indigo-600 uppercase">10 Years</div>
+            <div class="text-lg sm:text-xl font-bold text-indigo-950 mt-1" id="milestone-10">-</div>
+          </div>
+          <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+            <div class="text-xs font-semibold text-indigo-600 uppercase">20 Years</div>
+            <div class="text-lg sm:text-xl font-bold text-indigo-950 mt-1" id="milestone-20">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart Container -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <h2 class="font-semibold text-slate-800 mb-4">Comparison Growth Trajectory</h2>
+      <div class="relative h-80 sm:h-96 w-full">
+        <canvas id="projectionChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto space-y-4">
+      <h2 class="font-semibold text-slate-800">Milestone Breakdown Table</h2>
+      
+      <!-- Table Legend -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-2">
+        <div class="font-bold text-slate-700 text-sm">Legend & Reading the Data:</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div><span class="font-semibold text-slate-800">Format:</span> <code>Total Portfolio Value (+Net Interest/Gain)</code></div>
+          <div><span class="font-semibold text-slate-800">Cash Deposited:</span> Cumulative out-of-pocket contributions without interest.</div>
+          <div><span class="font-semibold text-blue-600">Savings (2.5% p.a.):</span> Low-risk continuous compounding cash account.</div>
+          <div><span class="font-semibold text-emerald-600">Bonds (4.0% p.a.):</span> Fixed income yield compounding monthly.</div>
+          <div><span class="font-semibold text-purple-600">Vanguard / Low-Fee Fund:</span> 2006–2025 market returns net of low <b>0.35% annual total fee</b>.</div>
+          <div><span class="font-semibold text-amber-600">Investment-Linked Policy (ILP):</span> Same market return sequence net of typical <b>2.50% annual fee drag</b> (policy charges + fund management + insurance cost of cover).</div>
+        </div>
+      </div>
+
+      <table class="w-full text-left text-sm border-collapse min-w-[750px]">
+        <thead>
+          <tr class="border-b border-slate-200 text-slate-500 font-medium">
+            <th class="pb-3">Timeframe</th>
+            <th class="pb-3">Cash Deposited</th>
+            <th class="pb-3 text-blue-600">Savings (2.5%)</th>
+            <th class="pb-3 text-emerald-600">Bonds (4.0%)</th>
+            <th class="pb-3 text-purple-600">Vanguard (0.35% Fee)</th>
+            <th class="pb-3 text-amber-600">Insurance ILP (2.50% Fee)</th>
+          </tr>
+        </thead>
+        <tbody id="table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+      </table>
+    </div>
+
+    <!-- Compounding Power & Insights Card -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+      <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+        <span class="text-xl">🚀</span>
+        <h2 class="font-semibold text-slate-800 text-lg">The Power of Compounding: How Your Money Works For You</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <!-- Principle 1: Interest on Interest -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+          <div class="font-bold text-indigo-900 flex items-center space-x-1">
+            <span>🔄</span>
+            <span>1. Interest Earning Interest</span>
+          </div>
+          <p class="text-slate-600 leading-relaxed text-xs sm:text-sm">
+            In early years, almost all portfolio growth comes from your monthly contributions. Over time, interest and market gains get reinvested back into your principal. Soon, <b>your existing growth generates its own returns</b>, shifting the growth engine from your salary to your accumulated wealth.
+          </p>
+        </div>
+
+        <!-- Principle 2: Exponential Curve -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+          <div class="font-bold text-indigo-900 flex items-center space-x-1">
+            <span>📈</span>
+            <span>2. The Exponential Curve</span>
+          </div>
+          <p class="text-slate-600 leading-relaxed text-xs sm:text-sm">
+            Compounding is non-linear. Look closely at Year 1 to 5 versus Year 15 to 20: the absolute dollar increase in the final 5 years is dramatically larger than the entire first decade combined. Time in the market acts as a multiplier.
+          </p>
+        </div>
+
+        <!-- Principle 3: Fee Erosion -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+          <div class="font-bold text-indigo-900 flex items-center space-x-1">
+            <span>⏳</span>
+            <span>3. High Fees Sabotage Compounding</span>
+          </div>
+          <p class="text-slate-600 leading-relaxed text-xs sm:text-sm">
+            Comparing low-fee Vanguard (0.35%) against an ILP (2.50%) reveals fee drag's hidden cost: a seemingly small 2.15% difference in fees can consume over 30–40% of total long-term wealth because those deducted fees never get the chance to compound over decades.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const config = {
+      currencySymbol: "£",
+      timeframes: [1, 3, 5, 10, 15, 20],
+      rates: {
+        savings: 0.025,
+        bonds: 0.040
+      },
+      // Real historical annual returns (2006 to 2025 sequence)
+      historicalMarketReturns: [
+        0.1561,  // 2006
+        0.0548,  // 2007
+        -0.3655, // 2008
+        0.2594,  // 2009
+        0.1482,  // 2010
+        0.0210,  // 2011
+        0.1589,  // 2012
+        0.3215,  // 2013
+        0.1352,  // 2014
+        0.0136,  // 2015
+        0.1196,  // 2016
+        0.2183,  // 2017
+        -0.0438, // 2018
+        0.3149,  // 2019
+        0.1840,  // 2020
+        0.3092,  // 2021
+        -0.1811, // 2022
+        0.2629,  // 2023
+        0.2502,  // 2024
+        0.1788   // 2025
+      ]
+    };
+
+    let chartInstance = null;
+    let saveIndicatorTimeout = null;
+
+    function calcCash(val, t) {
+      return val * 12 * t;
+    }
+
+    function calcSavings(val, t) {
+      const r = config.rates.savings / 12;
+      return val * ((Math.pow(1 + r, 12 * t) - 1) / r);
+    }
+
+    function calcBonds(val, t) {
+      const r = config.rates.bonds / 12;
+      return val * ((Math.pow(1 + r, 12 * t) - 1) / r);
+    }
+
+    // Dynamic simulation modeling DCA into historical returns minus specific annual total fee drag
+    function calcHistoricalFundSeries(monthlyVal, annualFeeRatio) {
+      const annualContributions = monthlyVal * 12;
+      const trajectory = [];
+      let totalPortfolio = 0;
+
+      for (let i = 0; i < config.historicalMarketReturns.length; i++) {
+        const yearReturn = config.historicalMarketReturns[i] - annualFeeRatio;
+        totalPortfolio = (totalPortfolio * (1 + yearReturn)) + (annualContributions * (1 + yearReturn / 2));
+        trajectory.push(totalPortfolio);
+      }
+      return trajectory;
+    }
+
+    function formatCurrency(num) {
+      return config.currencySymbol + Math.round(num).toLocaleString();
+    }
+
+    function formatGrowth(total, principal) {
+      const growth = total - principal;
+      const sign = growth >= 0 ? '+' : '';
+      return `<span class="text-xs font-normal opacity-85">(${sign}${formatCurrency(growth)})</span>`;
+    }
+
+    function showSaveIndicator() {
+      const indicator = document.getElementById('save-indicator');
+      indicator.classList.remove('opacity-0');
+      clearTimeout(saveIndicatorTimeout);
+      saveIndicatorTimeout = setTimeout(() => {
+        indicator.classList.add('opacity-0');
+      }, 1500);
+    }
+
+    function updateDashboard(monthlyAmount) {
+      const years = Array.from({ length: 20 }, (_, i) => i + 1);
+
+      const cashData = years.map(y => calcCash(monthlyAmount, y));
+      const savingsData = years.map(y => calcSavings(monthlyAmount, y));
+      const bondsData = years.map(y => calcBonds(monthlyAmount, y));
+      const vanguardData = calcHistoricalFundSeries(monthlyAmount, 0.0035); // 0.35% Fee
+      const ilpData = calcHistoricalFundSeries(monthlyAmount, 0.0250);      // 2.50% Fee
+
+      document.getElementById('milestone-5').innerHTML = `${formatCurrency(vanguardData[4])}<br>${formatGrowth(vanguardData[4], cashData[4])}`;
+      document.getElementById('milestone-10').innerHTML = `${formatCurrency(vanguardData[9])}<br>${formatGrowth(vanguardData[9], cashData[9])}`;
+      document.getElementById('milestone-20').innerHTML = `${formatCurrency(vanguardData[19])}<br>${formatGrowth(vanguardData[19], cashData[19])}`;
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      config.timeframes.forEach(t => {
+        const principal = calcCash(monthlyAmount, t);
+        const sav = calcSavings(monthlyAmount, t);
+        const bnd = calcBonds(monthlyAmount, t);
+        const vgd = vanguardData[t - 1];
+        const ilp = ilpData[t - 1];
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-3 font-semibold text-slate-700">${t} ${t === 1 ? 'Year' : 'Years'}</td>
+          <td class="py-3 text-slate-600">${formatCurrency(principal)}</td>
+          <td class="py-3 text-blue-600">${formatCurrency(sav)} ${formatGrowth(sav, principal)}</td>
+          <td class="py-3 text-emerald-600">${formatCurrency(bnd)} ${formatGrowth(bnd, principal)}</td>
+          <td class="py-3 text-purple-600 font-bold">${formatCurrency(vgd)} ${formatGrowth(vgd, principal)}</td>
+          <td class="py-3 text-amber-600 font-bold">${formatCurrency(ilp)} ${formatGrowth(ilp, principal)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      if (chartInstance) {
+        chartInstance.data.datasets[0].data = cashData;
+        chartInstance.data.datasets[1].data = savingsData;
+        chartInstance.data.datasets[2].data = bondsData;
+        chartInstance.data.datasets[3].data = vanguardData;
+        chartInstance.data.datasets[4].data = ilpData;
+        chartInstance.update();
+      } else {
+        const ctx = document.getElementById('projectionChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: years.map(y => `Yr ${y} (${2005 + y})`),
+            datasets: [
+              { label: 'Total Cash Deposited', data: cashData, borderColor: '#94a3b8', tension: 0.1 },
+              { label: 'Savings Account (2.5%)', data: savingsData, borderColor: '#3b82f6', tension: 0.1 },
+              { label: 'Fixed Deposit / Bonds (4.0%)', data: bondsData, borderColor: '#10b981', tension: 0.1 },
+              { label: 'Vanguard / DIY (0.35% Fee)', data: vanguardData, borderColor: '#8b5cf6', tension: 0.2 },
+              { label: 'Insurance ILP (2.50% Fee Drag)', data: ilpData, borderColor: '#d97706', tension: 0.2, borderDash: [4, 4] }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    let label = context.dataset.label || '';
+                    if (label) {
+                      label += ': ';
+                    }
+                    if (context.parsed.y !== null) {
+                      label += config.currencySymbol + Math.round(context.parsed.y).toLocaleString();
+                    }
+                    return label;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (value) => config.currencySymbol + value.toLocaleString()
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputEl = document.getElementById('monthly-input');
+      const sliderEl = document.getElementById('monthly-slider');
+      const enterBtn = document.getElementById('enter-btn');
+      const canvas = document.getElementById('projectionChart');
+
+      const handleUpdate = (val, isSaved = true) => {
+        const num = parseFloat(val) || 0;
+        inputEl.value = val;
+        sliderEl.value = num;
+        
+        if (isSaved) {
+          localStorage.setItem('monthlyContribution', val);
+          showSaveIndicator();
+        }
+        
+        updateDashboard(num);
+      };
+
+      // Live slider auto-save
+      sliderEl.addEventListener('input', (e) => handleUpdate(e.target.value, true));
+
+      // Input box text changes
+      inputEl.addEventListener('input', (e) => handleUpdate(e.target.value, true));
+
+      // Enter key or button click actions
+      const triggerConfirm = () => {
+        inputEl.blur();
+        handleUpdate(inputEl.value, true);
+      };
+
+      enterBtn.addEventListener('click', triggerConfirm);
+
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          triggerConfirm();
+        }
+      });
+
+      // Dismiss open chart tooltip on mobile tap outside
+      document.addEventListener('touchstart', (e) => {
+        // Blur text input if tapping elsewhere
+        if (document.activeElement === inputEl && e.target !== inputEl && e.target !== enterBtn) {
+          inputEl.blur();
+        }
+
+        // Hide chart tooltip if tapping outside the canvas
+        if (chartInstance && canvas && !canvas.contains(e.target)) {
+          chartInstance.setActiveElements([]);
+          if (chartInstance.tooltip) {
+            chartInstance.tooltip.setActiveElements([], { x: 0, y: 0 });
+          }
+          chartInstance.update();
+        }
+      });
+
+      // Load saved value from localStorage or fallback to 250
+      const savedAmount = localStorage.getItem('monthlyContribution') || '250';
+      handleUpdate(savedAmount, false);
+    });
+  </script>
+</body>
+</html>
