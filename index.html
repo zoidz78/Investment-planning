@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Savings & Investment Projection Dashboard</title>
+  <!-- Tailwind CSS & Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans p-4 sm:p-6">
+  <div class="max-w-5xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <h1 class="text-2xl font-bold text-slate-900">Savings & Investment Projection</h1>
+      <p class="text-slate-600 text-sm mt-1">
+        Compare long-term DCA growth across standard savings, fixed income, and volatile market index funds.
+      </p>
+    </header>
+
+    <!-- Controls & Summary Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Input Card -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+        <label for="monthly-input" class="block font-semibold text-slate-700">
+          Monthly Contribution (<span id="currency-symbol">£</span>)
+        </label>
+        <input 
+          type="number" 
+          id="monthly-input" 
+          class="w-full text-2xl font-bold border-2 border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-indigo-500"
+          value="500" 
+          step="50" 
+          min="10"
+        />
+        <input 
+          type="range" 
+          id="monthly-slider" 
+          class="w-full accent-indigo-600 cursor-pointer"
+          value="500" 
+          min="50" 
+          max="2500" 
+          step="50"
+        />
+        <p class="text-xs text-slate-500">Adjust amount to update projections across all 20 years.</p>
+      </div>
+
+      <!-- Key Milestones Card -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 md:col-span-2 flex flex-col justify-between">
+        <h2 class="font-semibold text-slate-800 border-b pb-2">Estimated Market Portfolio Milestones</h2>
+        <div class="grid grid-cols-3 gap-3 my-auto text-center py-2">
+          <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+            <div class="text-xs font-semibold text-indigo-600 uppercase">5 Years</div>
+            <div class="text-lg sm:text-xl font-bold text-indigo-950 mt-1" id="milestone-5">-</div>
+          </div>
+          <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+            <div class="text-xs font-semibold text-indigo-600 uppercase">10 Years</div>
+            <div class="text-lg sm:text-xl font-bold text-indigo-950 mt-1" id="milestone-10">-</div>
+          </div>
+          <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+            <div class="text-xs font-semibold text-indigo-600 uppercase">20 Years</div>
+            <div class="text-lg sm:text-xl font-bold text-indigo-950 mt-1" id="milestone-20">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart Container -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <h2 class="font-semibold text-slate-800 mb-4">Comparison Growth Trajectory</h2>
+      <div class="relative h-80 sm:h-96 w-full">
+        <canvas id="projectionChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+      <h2 class="font-semibold text-slate-800 mb-4">Milestone Breakdown Table</h2>
+      <table class="w-full text-left text-sm border-collapse min-w-[500px]">
+        <thead>
+          <tr class="border-b border-slate-200 text-slate-500 font-medium">
+            <th class="pb-3">Timeframe</th>
+            <th class="pb-3">Cash Deposited</th>
+            <th class="pb-3 text-blue-600">Savings (2.5%)</th>
+            <th class="pb-3 text-emerald-600">Bonds (4.0%)</th>
+            <th class="pb-3 text-purple-600">Vanguard (~7% w/ Volatility)</th>
+          </tr>
+        </thead>
+        <tbody id="table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    const config = {
+      currencySymbol: "£",
+      timeframes: [1, 3, 5, 10, 15, 20],
+      rates: {
+        savings: 0.025,
+        bonds: 0.040,
+        equity: 0.070
+      }
+    };
+
+    let chartInstance = null;
+
+    function calcCash(val, t) {
+      return val * 12 * t;
+    }
+
+    function calcSavings(val, t) {
+      const r = config.rates.savings / 12;
+      return val * ((Math.pow(1 + r, 12 * t) - 1) / r);
+    }
+
+    function calcBonds(val, t) {
+      const r = config.rates.bonds / 12;
+      return val * ((Math.pow(1 + r, 12 * t) - 1) / r);
+    }
+
+    function calcIndexFund(val, t) {
+      const effectiveAnnual = config.rates.equity + 0.04 * Math.sin(t * 1.2);
+      const r = effectiveAnnual / 12;
+      return val * ((Math.pow(1 + r, 12 * t) - 1) / r);
+    }
+
+    function formatCurrency(num) {
+      return config.currencySymbol + Math.round(num).toLocaleString();
+    }
+
+    function updateDashboard(monthlyAmount) {
+      const years = Array.from({ length: 20 }, (_, i) => i + 1);
+
+      const cashData = years.map(y => calcCash(monthlyAmount, y));
+      const savingsData = years.map(y => calcSavings(monthlyAmount, y));
+      const bondsData = years.map(y => calcBonds(monthlyAmount, y));
+      const fundData = years.map(y => calcIndexFund(monthlyAmount, y));
+
+      document.getElementById('milestone-5').textContent = formatCurrency(calcIndexFund(monthlyAmount, 5));
+      document.getElementById('milestone-10').textContent = formatCurrency(calcIndexFund(monthlyAmount, 10));
+      document.getElementById('milestone-20').textContent = formatCurrency(calcIndexFund(monthlyAmount, 20));
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      config.timeframes.forEach(t => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-3 font-semibold text-slate-700">${t} ${t === 1 ? 'Year' : 'Years'}</td>
+          <td class="py-3 text-slate-600">${formatCurrency(calcCash(monthlyAmount, t))}</td>
+          <td class="py-3 text-blue-600">${formatCurrency(calcSavings(monthlyAmount, t))}</td>
+          <td class="py-3 text-emerald-600">${formatCurrency(calcBonds(monthlyAmount, t))}</td>
+          <td class="py-3 text-purple-600 font-bold">${formatCurrency(calcIndexFund(monthlyAmount, t))}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      if (chartInstance) {
+        chartInstance.data.datasets[0].data = cashData;
+        chartInstance.data.datasets[1].data = savingsData;
+        chartInstance.data.datasets[2].data = bondsData;
+        chartInstance.data.datasets[3].data = fundData;
+        chartInstance.update();
+      } else {
+        const ctx = document.getElementById('projectionChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: years.map(y => `Yr ${y}`),
+            datasets: [
+              { label: 'Total Cash Deposited', data: cashData, borderColor: '#94a3b8', tension: 0.1 },
+              { label: 'Savings Account (2.5%)', data: savingsData, borderColor: '#3b82f6', tension: 0.1 },
+              { label: 'Fixed Deposit / Bonds (4.0%)', data: bondsData, borderColor: '#10b981', tension: 0.1 },
+              { label: 'Vanguard / Market (~7.0% Net)', data: fundData, borderColor: '#8b5cf6', tension: 0.3 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (value) => config.currencySymbol + value.toLocaleString()
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputEl = document.getElementById('monthly-input');
+      const sliderEl = document.getElementById('monthly-slider');
+
+      const handleUpdate = (val) => {
+        const num = parseFloat(val) || 0;
+        inputEl.value = num;
+        sliderEl.value = num;
+        updateDashboard(num);
+      };
+
+      inputEl.addEventListener('input', (e) => handleUpdate(e.target.value));
+      sliderEl.addEventListener('input', (e) => handleUpdate(e.target.value));
+
+      handleUpdate(100);
+    });
+  </script>
+</body>
+</html>
