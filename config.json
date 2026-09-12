@@ -1,0 +1,9 @@
+{
+  "currencySymbol": "£",
+  "timeframes": [1, 3, 5, 10, 15, 20],
+  "rates": {
+    "savings": 0.025,
+    "bonds": 0.040,
+    "equity": 0.070
+  }
+}
